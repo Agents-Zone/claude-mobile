@@ -1,0 +1,32 @@
+{
+  "_comment": "Copy this to roles.json and edit. roles.json is gitignored so your real working directories never get committed.",
+  "claudeExecutable": "",
+  "host": "0.0.0.0",
+  "port": 8787,
+  "roles": [
+    {
+      "id": "project-a",
+      "name": "Project A",
+      "emoji": "🚀",
+      "cwd": "~/projects/project-a",
+      "model": "opus",
+      "permissionMode": "acceptEdits"
+    },
+    {
+      "id": "writing",
+      "name": "Writing",
+      "emoji": "✍️",
+      "cwd": "~/projects/writing",
+      "model": "opus",
+      "permissionMode": "acceptEdits"
+    },
+    {
+      "id": "scratch",
+      "name": "Scratch",
+      "emoji": "🎲",
+      "cwd": "~/scratch",
+      "model": "opus",
+      "permissionMode": "acceptEdits"
+    }
+  ]
+}

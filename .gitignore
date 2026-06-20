@@ -1,0 +1,13 @@
+# Your real config — never commit working directories / personal paths.
+# Start from roles.example.json: cp roles.example.json roles.json
+roles.json
+
+# Dependencies & build output
+node_modules/
+server/dist/
+web/dist/
+*.tsbuildinfo
+
+# Logs & OS cruft
+*.log
+.DS_Store

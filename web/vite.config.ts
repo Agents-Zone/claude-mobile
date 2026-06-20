@@ -1,0 +1,17 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// In dev, proxy API/WS/files to the backend so the phone hits one origin.
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+    port: 5173,
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/files': { target: 'http://127.0.0.1:8787', changeOrigin: true },
+      '/ws': { target: 'ws://127.0.0.1:8787', ws: true },
+    },
+  },
+  build: { outDir: 'dist', emptyOutDir: true },
+});

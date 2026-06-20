@@ -1,0 +1,24 @@
+{
+  "name": "claude-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Phone-friendly web client for driving claude-code on your own machine over a private network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Agents-Zone/claude-mobile.git"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace server run dev",
+    "dev:web": "npm --workspace web run dev",
+    "build:web": "npm --workspace web run build",
+    "start": "npm --workspace server run start",
+    "test": "node test/regression.mjs",
+    "test:static": "node test/regression.mjs --static-only",
+    "test:live": "node test/regression.mjs --live-only"
+  }
+}
