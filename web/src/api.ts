@@ -24,6 +24,7 @@ export type ServerEvent =
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
   | { type: 'result'; ok: boolean; usage?: any; costUsd?: number; numTurns?: number; text?: string }
   | { type: 'error'; message: string }
+  | { type: 'sync'; sessionId: string | null; busy: boolean }
   | { type: 'idle' };
 
 export async function fetchRoles(): Promise<Role[]> {

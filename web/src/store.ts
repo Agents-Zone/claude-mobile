@@ -17,6 +17,7 @@ export class RoleSession {
   busy = false;
   private sock: ChatSocket;
   private listeners = new Set<() => void>();
+  private resyncTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(role: Role) {
     this.role = role;
@@ -25,6 +26,16 @@ export class RoleSession {
       (e) => this.onEvent(e),
       (s) => {
         this.status = s;
+        // On (re)connect the server replays the real busy/idle state. As a
+        // safety net, if we still think we're busy but no event lands shortly
+        // after reconnecting, clear the spinner so the UI can't lock forever.
+        if (s === 'open' && this.busy) {
+          if (this.resyncTimer) clearTimeout(this.resyncTimer);
+          this.resyncTimer = setTimeout(() => {
+            this.busy = false;
+            this.emit();
+          }, 4000);
+        }
         this.emit();
       }
     );
@@ -39,7 +50,14 @@ export class RoleSession {
   }
 
   private onEvent(e: ServerEvent) {
+    // Any authoritative state from the server supersedes the reconnect timeout.
+    if (this.resyncTimer) {
+      clearTimeout(this.resyncTimer);
+      this.resyncTimer = null;
+    }
     this.items = reduce(this.items, e);
+    // `sync` is the reconnect snapshot: adopt its authoritative busy state.
+    if (e.type === 'sync') this.busy = e.busy;
     if (e.type === 'result' || e.type === 'idle' || e.type === 'error') this.busy = false;
     this.emit();
   }

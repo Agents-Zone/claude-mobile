@@ -14,6 +14,7 @@ export type ServerEvent =
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
   | { type: 'result'; ok: boolean; usage?: unknown; costUsd?: number; numTurns?: number; text?: string }
   | { type: 'error'; message: string }
+  | { type: 'sync'; sessionId: string | null; busy: boolean }
   | { type: 'idle' };
 
 type Emit = (e: ServerEvent) => void;
@@ -114,6 +115,8 @@ export class Session {
   private resumeId: string | null;
   sessionId: string | null = null;
   private pumpStarted = false;
+  /** True while a turn is in flight (between send and result/error). */
+  busy = false;
 
   constructor(role: RoleConfig, executable: string, emit: Emit, resumeId: string | null = null) {
     this.role = role;
@@ -126,9 +129,20 @@ export class Session {
     this.emit = emit;
   }
 
+  /**
+   * Replay current state to a (re)connecting client via a dedicated `sync`
+   * event (NOT the turn-lifecycle `idle`/`result`, which clients resolve on).
+   * Carries the session id and whether a turn is in flight, so a client that
+   * reconnects after a turn finished can clear its spinner instead of hanging.
+   */
+  replayState() {
+    this.emit({ type: 'sync', sessionId: this.sessionId, busy: this.busy });
+  }
+
   /** Send a user message. Lazily starts the subprocess on first send. */
   send(text: string) {
     if (!this.pumpStarted) this.start();
+    this.busy = true;
     this.queue.push(text);
   }
 
@@ -154,7 +168,9 @@ export class Session {
       } as any,
     });
     this.pump().catch((e) => {
+      this.busy = false;
       this.emit({ type: 'error', message: `session crashed: ${(e as Error).message}` });
+      this.emit({ type: 'idle' });
     });
   }
 
@@ -219,6 +235,7 @@ export class Session {
       case 'result': {
         const r = msg as any;
         if (r.session_id) this.sessionId = r.session_id;
+        this.busy = false;
         this.emit({
           type: 'result',
           ok: r.subtype === 'success',

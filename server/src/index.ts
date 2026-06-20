@@ -80,8 +80,9 @@ app.get('/ws/:id', { websocket: true }, (socket, req) => {
   };
 
   let session = manager.get(role, emit);
-  // tell the client the current session id (if any) on connect
-  if (session.sessionId) emit({ type: 'session', sessionId: session.sessionId });
+  // Sync the (re)connecting client: session id + current busy/idle state, so a
+  // client reconnecting after a turn finished doesn't stay stuck on a spinner.
+  session.replayState();
 
   socket.on('message', async (raw: Buffer) => {
     let data: any;

@@ -324,6 +324,29 @@ async function liveTests() {
   ok('new conversation starts a different session id', session3 && session3 !== session1, `${session1} vs ${session3}`);
 
   ws.close();
+
+  // Reconnect AFTER a turn finished: the server must send a `sync` carrying the
+  // real (idle) state so a reconnecting client doesn't hang on a spinner. The
+  // sync must NOT be a bare `idle` (that would make clients think a fresh turn
+  // already completed). Regression guard for the reconnect-stuck-spinner bug.
+  section('LIVE · reconnect sends sync(idle) snapshot');
+  const ws2 = wsConnect();
+  await waitOpen(ws2);
+  const sync = await new Promise((res) => {
+    const timer = setTimeout(() => res(null), 5000);
+    ws2.addEventListener('message', (ev) => {
+      const e = JSON.parse(ev.data);
+      if (e.type === 'sync') {
+        clearTimeout(timer);
+        res(e);
+      }
+    });
+  });
+  ok('reconnect emits a sync event', !!sync, JSON.stringify(sync));
+  ok('sync carries the session id', !!sync?.sessionId);
+  ok('sync reports not-busy (idle)', sync?.busy === false);
+  ws2.close();
+
   rmSync(marker, { force: true });
 }
 
