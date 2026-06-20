@@ -164,6 +164,8 @@ Node 后端 (Fastify, TypeScript)
 
 驱动用 [`@anthropic-ai/claude-agent-sdk`](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk)，streaming-input 模式让每个角色保持一个常驻进程，`resume` 续接同一会话。
 
+内部怎么搭的、一条消息的完整路径、WebSocket 协议、源码地图，详见 **[docs/architecture.md](docs/architecture.md)**。
+
 开发模式：
 
 ```bash
