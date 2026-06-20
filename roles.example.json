@@ -1,7 +1,8 @@
 {
   "_comment": "Copy this to roles.json and edit. roles.json is gitignored so your real working directories never get committed.",
+  "_comment_host": "Recommended: bind to your Tailscale IP (find it with: tailscale ip -4) so the server is only reachable on your private tailnet, never the public internet. Use 127.0.0.1 for local-only.",
   "claudeExecutable": "",
-  "host": "0.0.0.0",
+  "host": "127.0.0.1",
   "port": 8787,
   "roles": [
     {

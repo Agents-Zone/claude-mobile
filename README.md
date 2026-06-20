@@ -70,7 +70,7 @@ Edit `roles.json` (gitignored — your working directories never get committed):
 ```json
 {
   "claudeExecutable": "",
-  "host": "0.0.0.0",
+  "host": "100.x.y.z",
   "port": 8787,
   "roles": [
     {
@@ -88,7 +88,7 @@ Edit `roles.json` (gitignored — your working directories never get committed):
 | Field | Meaning |
 |---|---|
 | `claudeExecutable` | Absolute path to the `claude` binary. Leave `""` to auto-detect via `which claude`. |
-| `host` | Interface to bind. Use your private-network IP (e.g. your Tailscale IP) to avoid listening on the public internet, or `127.0.0.1` for local-only. |
+| `host` | Interface to bind. **Recommended: your Tailscale IP** (`tailscale ip -4`) so the server stays on your private tailnet and off the public internet. Use `127.0.0.1` for local-only. See [Access](#access-recommended-tailscale). |
 | `port` | Port to listen on. |
 | `cwd` | Role working directory (must exist). `~` is expanded. |
 | `permissionMode` | `acceptEdits` (auto-approve edits) / `default` / `bypassPermissions` (no checks at all — see Security) / `dontAsk`. |
@@ -127,6 +127,56 @@ Uninstall: launchctl bootout gui/$(id -u)/local.claude-mobile \
 
 To keep the service reachable, the host machine must stay awake (disable
 automatic sleep) — when it sleeps it drops off the network.
+
+## Access (recommended: Tailscale)
+
+There is deliberately **no login screen**. Instead of building authentication
+into the app, put the host on a private network and let the network be the
+authentication boundary. [Tailscale](https://tailscale.com) is the easiest way
+to do this and is the recommended setup.
+
+Why this is safe without an app password:
+
+- A Tailscale tailnet is a private, end-to-end-encrypted WireGuard network.
+  Only devices **you** have logged into the same Tailscale account can reach it.
+- Binding the server to the host's Tailscale IP means it is **never** listening
+  on the public internet — there is nothing for a random scanner to find.
+- So "who can open the page" is already answered by "whose phone is on my
+  tailnet", and an extra password would only protect against other devices you
+  yourself added.
+
+### Setup
+
+1. Install Tailscale on the **host** and sign in. Find its tailnet address:
+
+   ```bash
+   tailscale ip -4          # e.g. 100.x.y.z
+   tailscale status --json | grep DNSName   # MagicDNS name, e.g. host.tailXXXX.ts.net
+   ```
+
+2. Set `host` in `roles.json` to that Tailscale IP, so the server only binds to
+   the tailnet interface (not the public internet):
+
+   ```json
+   { "host": "100.x.y.z", "port": 8787, "roles": [ ... ] }
+   ```
+
+3. Install Tailscale on your **phone** (iOS App Store / Google Play / APK) and
+   sign in with the **same account**. Turn the VPN toggle on.
+
+4. Open the client in your phone browser:
+
+   ```
+   http://host.tailXXXX.ts.net:8787      # MagicDNS name (preferred — stable)
+   http://100.x.y.z:8787                  # or the raw Tailscale IP
+   ```
+
+   Tip: use the MagicDNS name; the IP can change, the name won't. Add it to your
+   home screen for an app-like, full-screen launch.
+
+If you don't use Tailscale, any other private network works the same way (home
+LAN, WireGuard, a VPN) — bind `host` to that interface. **Do not** bind to a
+public IP without adding your own authentication and TLS (see Security).
 
 ## Security
 

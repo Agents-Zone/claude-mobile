@@ -17,6 +17,7 @@
     "dev:web": "npm --workspace web run dev",
     "build:web": "npm --workspace web run build",
     "start": "npm --workspace server run start",
+    "lint": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
     "test": "node test/regression.mjs",
     "test:static": "node test/regression.mjs --static-only",
     "test:live": "node test/regression.mjs --live-only"
