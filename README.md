@@ -14,7 +14,6 @@ the server is never exposed to the public internet.
 - **Multiple roles** — each role has its own working directory. A role's skills
   and slash commands come from the `.claude/` directory inside its `cwd`, so
   each role behaves like its own project.
-- **Drawer menu** — tap ☰ for a slide-in list of all roles with live status.
 - **Non-blocking role switching** — every role keeps its own live session, so a
   turn running for one role keeps streaming while you read another.
 - **Multi-turn continuity** — one long-lived `claude-code` process per role,
