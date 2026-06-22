@@ -3,12 +3,15 @@ import type { Role } from '../api';
 import { store } from '../store';
 import { MessageView } from './Message';
 import { FileBrowser } from './FileBrowser';
+import { ReviewQueue } from './ReviewQueue';
+
+type View = 'chat' | 'files' | 'review';
 
 export function Chat({ role, onMenu }: { role: Role; onMenu: () => void }) {
   const sess = store.ensure(role);
   const [, bump] = useReducer((x) => x + 1, 0);
   const [input, setInput] = useState('');
-  const [showFiles, setShowFiles] = useState(false);
+  const [view, setView] = useState<View>('chat');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // subscribe to THIS role's session; re-render on its events
@@ -34,14 +37,27 @@ export function Chat({ role, onMenu }: { role: Role; onMenu: () => void }) {
           <span>{role.name}</span>
           <span className={`dot ${sess.status}`} title={sess.status} />
         </div>
-        <button className="icon-btn" onClick={() => setShowFiles((v) => !v)} title="文件">
-          {showFiles ? '✕' : '📁'}
+        <button
+          className="icon-btn"
+          onClick={() => setView((v) => (v === 'review' ? 'chat' : 'review'))}
+          title="审阅队列"
+        >
+          {view === 'review' ? '✕' : '☑'}
+        </button>
+        <button
+          className="icon-btn"
+          onClick={() => setView((v) => (v === 'files' ? 'chat' : 'files'))}
+          title="文件"
+        >
+          {view === 'files' ? '✕' : '📁'}
         </button>
         <button className="icon-btn" onClick={() => sess.newConversation()} title="新对话">✎</button>
       </header>
 
-      {showFiles ? (
-        <FileBrowser role={role} onClose={() => setShowFiles(false)} />
+      {view === 'files' ? (
+        <FileBrowser role={role} onClose={() => setView('chat')} />
+      ) : view === 'review' ? (
+        <ReviewQueue role={role} />
       ) : (
         <div className="messages" ref={scrollRef}>
           {sess.items.length === 0 && (
@@ -54,7 +70,7 @@ export function Chat({ role, onMenu }: { role: Role; onMenu: () => void }) {
         </div>
       )}
 
-      {!showFiles && (
+      {view === 'chat' && (
         <div className="composer">
           <textarea
             value={input}
