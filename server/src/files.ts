@@ -1,5 +1,5 @@
-import { realpathSync, statSync, readdirSync } from 'node:fs';
-import { resolve, join, relative, sep, extname } from 'node:path';
+import { realpathSync, statSync, readdirSync, mkdirSync, lstatSync } from 'node:fs';
+import { resolve, join, relative, sep, extname, dirname } from 'node:path';
 import type { RoleConfig } from './config.js';
 
 export interface FileNode {
@@ -65,6 +65,35 @@ export function safeResolve(role: RoleConfig, relPath: string): string {
   }
 
   return target;
+}
+
+/**
+ * Resolve a write target inside a role cwd. Used by the decision write-back
+ * endpoint — the ONLY HTTP path that writes into a role cwd, and only ever to a
+ * fixed relative path the server controls (never raw user input).
+ *
+ * safeResolve alone is NOT sufficient for writes: it was built for the read
+ * path, and a dangling leaf symlink (e.g. `.data/decisions.json -> ../evil`
+ * whose target does not yet exist) slips past its realpath check — realpath
+ * throws ENOENT on the missing target, the guard walks up to the in-cwd parent
+ * and passes, and then writeFileSync would FOLLOW the symlink out of the cwd.
+ * So here we additionally lstat the leaf and refuse to write through a symlink.
+ */
+export function safeResolveForWrite(role: RoleConfig, relPath: string): string {
+  const abs = safeResolve(role, relPath);
+  mkdirSync(dirname(abs), { recursive: true });
+  // No-follow guard: if the target already exists and is a symlink, refuse —
+  // writing would follow it, potentially escaping the cwd. A regular file is
+  // fine (overwrite in place); a missing target is fine (fresh create).
+  try {
+    if (lstatSync(abs).isSymbolicLink()) {
+      throw new PathEscapeError('refusing to write through a symlink');
+    }
+  } catch (e) {
+    if (e instanceof PathEscapeError) throw e;
+    // ENOENT — target doesn't exist yet, safe to create.
+  }
+  return abs;
 }
 
 export function listDir(role: RoleConfig, relPath: string): { dir: string; entries: FileNode[] } {

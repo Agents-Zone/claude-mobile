@@ -206,3 +206,28 @@ a { color: var(--accent); }
 
 .banner { padding: 10px 14px; border-radius: 10px; margin: 10px; font-size: 14px; }
 .banner.error { background: #3a1d1d; color: #fca5a5; }
+.banner.ok { background: #14321f; color: #6ee7b7; }
+
+/* --- Review queue (App-in-Skill) --- */
+.reviewq { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.rq-list { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.rq-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.rq-item.risk-high { border-color: var(--err); }
+.rq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rq-title { font-weight: 600; font-size: 15px; }
+.rq-risk { color: var(--err); font-size: 12px; white-space: nowrap; }
+.rq-action { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.rq-diff { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.rq-diff pre { margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+.rq-before { background: #2a1518; color: #fca5a5; text-decoration: line-through; opacity: 0.75; }
+.rq-after { background: #14241a; color: #86efac; }
+.rq-edit { margin-top: 8px; width: 100%; background: var(--bg3); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; font-size: 14px; box-sizing: border-box; resize: vertical; }
+.rq-actions { display: flex; gap: 8px; margin-top: 10px; }
+.rq-btn { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--fg); font-size: 14px; }
+.rq-btn:active { opacity: 0.7; }
+.rq-btn.approve.on { background: var(--ok); border-color: var(--ok); color: #04140c; font-weight: 600; }
+.rq-btn.edit.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.rq-btn.reject.on { background: var(--err); border-color: var(--err); color: #fff; font-weight: 600; }
+.rq-submit { position: sticky; bottom: 0; padding: 12px; background: var(--bg); border-top: 1px solid var(--border); }
+.rq-submit button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; }
+.rq-submit button:disabled { opacity: 0.4; }

@@ -1,12 +1,24 @@
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
-import { existsSync, createReadStream } from 'node:fs';
+import { existsSync, createReadStream, writeFileSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, REPO_ROOT, type RoleConfig } from './config.js';
 import { SessionManager, type ServerEvent } from './session.js';
-import { listDir, safeResolve, PathEscapeError } from './files.js';
+import { listDir, safeResolve, safeResolveForWrite, PathEscapeError } from './files.js';
+
+// Where the review queue writes the human's decisions, relative to a role cwd.
+// The batch itself (.data/current_batch.json) is read via the existing
+// /files/:id/* artifact route, so only the write target is named here.
+const DECISIONS_REL = '.data/decisions.json';
+
+type Verdict = 'approve' | 'reject' | 'edit';
+interface Decision {
+  itemId: string;
+  verdict: Verdict;
+  editedText?: string;
+}
 
 const cfg = loadConfig();
 const manager = new SessionManager(cfg.claudeExecutable);
@@ -50,6 +62,64 @@ app.get<{ Params: { id: string; '*': string } }>('/files/:id/*', async (req, rep
   reply.header('X-Content-Type-Options', 'nosniff');
   return reply.type(contentType(abs)).send(createReadStream(abs));
 });
+
+// --- Review queue: write human decisions back for a skill to read (guarded) ---
+// This is the ONLY HTTP endpoint that writes into a role cwd. It writes a single
+// fixed file (.data/decisions.json) — never a caller-supplied path — and the
+// app/web side never touches the outside world. External side effects stay the
+// skill's job: it reads decisions.json and acts only on approved items.
+const VERDICTS: ReadonlySet<string> = new Set(['approve', 'reject', 'edit']);
+// A review batch is a single human's worth of decisions; cap it so the contract
+// is explicit rather than incidental on Fastify's 1 MiB body default.
+const MAX_DECISIONS = 1000;
+
+app.post<{ Params: { id: string }; Body: { decisions?: unknown } }>(
+  '/api/roles/:id/decisions',
+  async (req, reply) => {
+    const role = rolesById.get(req.params.id);
+    if (!role) return reply.code(404).send({ error: 'unknown role' });
+
+    const raw = req.body?.decisions;
+    if (!Array.isArray(raw)) {
+      return reply.code(400).send({ error: 'body.decisions must be an array' });
+    }
+    if (raw.length > MAX_DECISIONS) {
+      return reply.code(400).send({ error: `too many decisions (max ${MAX_DECISIONS})` });
+    }
+    const decisions: Decision[] = [];
+    for (const d of raw) {
+      if (!d || typeof d !== 'object') {
+        return reply.code(400).send({ error: 'each decision must be an object' });
+      }
+      const { itemId, verdict, editedText } = d as Record<string, unknown>;
+      if (typeof itemId !== 'string' || !itemId) {
+        return reply.code(400).send({ error: 'decision.itemId must be a non-empty string' });
+      }
+      if (typeof verdict !== 'string' || !VERDICTS.has(verdict)) {
+        return reply.code(400).send({ error: `decision.verdict must be one of ${[...VERDICTS].join(', ')}` });
+      }
+      if (editedText !== undefined && typeof editedText !== 'string') {
+        return reply.code(400).send({ error: 'decision.editedText must be a string' });
+      }
+      decisions.push({ itemId, verdict: verdict as Verdict, ...(editedText !== undefined ? { editedText } : {}) });
+    }
+
+    let abs: string;
+    try {
+      abs = safeResolveForWrite(role, DECISIONS_REL);
+    } catch (e) {
+      const code = e instanceof PathEscapeError ? 400 : 500;
+      return reply.code(code).send({ error: (e as Error).message });
+    }
+    const payload = { decisions, updatedAt: new Date().toISOString() };
+    // Atomic write: the skill polls this file independently, so a partial/torn
+    // read must never happen. Write a temp file then rename (atomic same-fs).
+    const tmp = abs + '.tmp';
+    writeFileSync(tmp, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+    renameSync(tmp, abs);
+    return { ok: true, count: decisions.length };
+  }
+);
 
 function contentType(p: string): string {
   const e = p.toLowerCase();

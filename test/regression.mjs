@@ -62,6 +62,17 @@ spawnSync('mkdir', ['-p', TEST_CWD]);
 const NFC_NAME = '散热器测试.md';
 writeFileSync(join(TEST_CWD, NFC_NAME), '# 测试\n器 character present\n');
 writeFileSync(join(TEST_CWD, 'sample.txt'), 'hello-artifact\n');
+// seed a review-queue batch for the App-in-Skill handoff tests
+spawnSync('mkdir', ['-p', join(TEST_CWD, '.data')]);
+writeFileSync(
+  join(TEST_CWD, '.data', 'current_batch.json'),
+  JSON.stringify({
+    items: [
+      { id: 'b1', title: 'edit draft', before: 'old', after: 'new', risk: 'low', action: 'edit' },
+      { id: 'b2', title: 'send email', after: 'drafted', risk: 'high', action: 'send' },
+    ],
+  })
+);
 
 function realClaudeExe() {
   // mirror roles.json default; fall back to PATH lookup
@@ -103,6 +114,14 @@ function run(cmd, cmdArgs, opts = {}) {
 async function get(path) {
   const r = await fetch(BASE + path);
   return { status: r.status, ct: r.headers.get('content-type') || '', text: await r.text() };
+}
+async function post(path, body) {
+  const r = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { status: r.status, text: await r.text() };
 }
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -222,6 +241,37 @@ async function staticTests() {
 
   const spaFallback = await get('/some/client/route');
   ok('client route → SPA index fallback', spaFallback.status === 200 && spaFallback.text.includes('<div id="root">'));
+
+  section('STATIC · review queue (App-in-Skill handoff)');
+  // read batch via the existing artifact route (the frontend's fetchBatch)
+  const batch = await get('/files/test/' + ['.data', 'current_batch.json'].map(encodeURIComponent).join('/'));
+  ok('GET batch → 200', batch.status === 200);
+  let bj;
+  try { bj = JSON.parse(batch.text); } catch {}
+  ok('batch has seeded items', bj?.items?.length === 2 && bj.items[1].risk === 'high');
+
+  // write decisions back
+  const okPost = await post('/api/roles/test/decisions', {
+    decisions: [
+      { itemId: 'b1', verdict: 'edit', editedText: 'edited!' },
+      { itemId: 'b2', verdict: 'approve' },
+    ],
+  });
+  ok('POST decisions → 200', okPost.status === 200 && JSON.parse(okPost.text || '{}').count === 2);
+
+  // read back exactly what landed on disk (skill's view)
+  const back = await get('/files/test/' + ['.data', 'decisions.json'].map(encodeURIComponent).join('/'));
+  let dj;
+  try { dj = JSON.parse(back.text); } catch {}
+  ok('decisions.json round-trips', dj?.decisions?.[0]?.editedText === 'edited!' && dj.decisions[1].verdict === 'approve');
+  ok('decisions.json stamped updatedAt', typeof dj?.updatedAt === 'string');
+
+  // guards: bad input must be rejected, role scoping enforced
+  ok('non-array body → 400', (await post('/api/roles/test/decisions', { decisions: 'x' })).status === 400);
+  ok('invalid verdict → 400', (await post('/api/roles/test/decisions', { decisions: [{ itemId: 'a', verdict: 'nuke' }] })).status === 400);
+  ok('empty itemId → 400', (await post('/api/roles/test/decisions', { decisions: [{ itemId: '', verdict: 'approve' }] })).status === 400);
+  ok('over-cap → 400', (await post('/api/roles/test/decisions', { decisions: Array.from({ length: 1001 }, (_, i) => ({ itemId: String(i), verdict: 'approve' })) })).status === 400);
+  ok('decisions for unknown role → 404', (await post('/api/roles/nope/decisions', { decisions: [] })).status === 404);
 }
 
 // =====================================================================

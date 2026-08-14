@@ -43,6 +43,52 @@ export function fileUrl(roleId: string, path: string): string {
   return `/files/${roleId}/${path.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+// --- Review queue (App-in-Skill handoff) ---
+
+export type Verdict = 'approve' | 'reject' | 'edit';
+
+/** One item a skill has queued for human review (.data/current_batch.json). */
+export interface BatchItem {
+  id: string;
+  title?: string;
+  before?: string;
+  after?: string;
+  risk?: 'low' | 'high';
+  action?: string;
+}
+
+export interface ReviewBatch {
+  items: BatchItem[];
+}
+
+export interface Decision {
+  itemId: string;
+  verdict: Verdict;
+  editedText?: string;
+}
+
+/**
+ * Read the role's review batch. Reuses the read-only artifact route, so a role
+ * with no queued batch simply 404s — callers treat that as "nothing to review".
+ */
+export async function fetchBatch(roleId: string): Promise<ReviewBatch | null> {
+  const r = await fetch(fileUrl(roleId, '.data/current_batch.json'));
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'failed');
+  const j = await r.json();
+  return { items: Array.isArray(j.items) ? j.items : [] };
+}
+
+/** Write the human's decisions back for the skill to act on. */
+export async function postDecisions(roleId: string, decisions: Decision[]): Promise<void> {
+  const r = await fetch(`/api/roles/${roleId}/decisions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ decisions }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'failed');
+}
+
 /** Thin reconnecting WebSocket wrapper for one role's chat. */
 export class ChatSocket {
   private ws: WebSocket | null = null;
